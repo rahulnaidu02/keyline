@@ -1,6 +1,6 @@
 {
   "name": "KeyLine",
-  "firstMessage": "Thanks for calling KeyLine. Are you looking up a code or changing one?",
+  "firstMessage": "Hey, thanks for calling KeyLine. Tell me, how can I help you? Are you looking for a code or changing one? Let me know how I can help.",
   "firstMessageMode": "assistant-speaks-first",
   "model": {
     "provider": "anthropic",
