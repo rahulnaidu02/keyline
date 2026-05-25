@@ -1,6 +1,6 @@
 {
   "name": "KeyLine",
-  "firstMessage": "Thanks for calling KeyLine. What's the unit name on the sticker, and what number are you calling from?",
+  "firstMessage": "Thanks for calling KeyLine. What's the name of the unit on the sticker?",
   "firstMessageMode": "assistant-speaks-first",
   "model": {
     "provider": "anthropic",

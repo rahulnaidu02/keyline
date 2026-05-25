@@ -1,7 +1,14 @@
 // KeyLine: get_code edge function
-// Called by Vapi as a function tool. Authenticates by caller phone,
-// looks up active code for the requested unit, logs the access,
-// returns Vapi's expected tool-call-result format.
+// Called by Vapi as a function tool.
+//
+// Flow:
+//   1. Look up the unit by label (case-insensitive).
+//   2. If unit not found → not_found.
+//   3. If unit policy = 'open' → return active code (no auth).
+//   4. If unit policy = 'restricted':
+//        - If phone missing       → needs_phone (agent asks caller)
+//        - If phone not authorized → denied
+//        - Else                   → return code.
 //
 // Deploy:  supabase functions deploy get_code --no-verify-jwt
 // Secrets: supabase secrets set VAPI_SHARED_SECRET=<long-random>
@@ -40,10 +47,27 @@ function reply(toolCallId: string, result: unknown) {
   );
 }
 
+async function logAccess(opts: {
+  org_id: string | null;
+  unit_id: string | null;
+  end_user_id: string | null;
+  call_id: string | null;
+  result: string;
+  reason: string | null;
+}) {
+  await supa.rpc("log_access", {
+    p_org_id: opts.org_id,
+    p_unit_id: opts.unit_id,
+    p_end_user_id: opts.end_user_id,
+    p_call_id: opts.call_id,
+    p_result: opts.result,
+    p_reason: opts.reason,
+  });
+}
+
 Deno.serve(async (req) => {
   // ─── auth: shared-secret header from Vapi ───────────────────────────────
-  const secret = req.headers.get("x-vapi-secret");
-  if (!SHARED_SECRET || secret !== SHARED_SECRET) {
+  if (!SHARED_SECRET || req.headers.get("x-vapi-secret") !== SHARED_SECRET) {
     return new Response("unauthorized", { status: 401 });
   }
 
@@ -61,88 +85,100 @@ Deno.serve(async (req) => {
 
   const callId = body.message.call?.id ?? null;
   const args = parseArgs(toolCall.function.arguments) as {
-    phone_e164?: string;
     unit_label?: string;
+    phone_e164?: string;
   };
 
-  if (!args.phone_e164 || !args.unit_label) {
+  if (!args.unit_label) {
     return reply(toolCall.id, {
       ok: false,
-      error: "missing_args",
-      message: "I need your phone number and the unit name.",
+      error: "missing_unit",
+      message: "I need the unit name from the sticker.",
     });
   }
 
-  // ─── 1. verify caller by phone ─────────────────────────────────────────
-  const { data: vData, error: vErr } = await supa.rpc("verify_caller", {
-    p_phone: args.phone_e164,
-  });
-
-  if (vErr) {
-    console.error("verify_caller error", vErr);
-    return reply(toolCall.id, { ok: false, error: "internal", message: "Something went wrong on my end. Let me transfer you." });
-  }
-
-  const row = Array.isArray(vData) ? vData[0] : vData;
-  if (!row?.end_user_id) {
-    await supa.rpc("log_access", {
-      p_org_id: null,
-      p_unit_id: null,
-      p_end_user_id: null,
-      p_call_id: callId,
-      p_result: "denied",
-      p_reason: "phone_not_registered",
-    });
-    return reply(toolCall.id, {
-      ok: false,
-      error: "phone_not_registered",
-      message: "I don't recognize that phone number. Please make sure your operator has added you, or stay on the line to talk to a person.",
-    });
-  }
-
-  // ─── 2. fetch active code ───────────────────────────────────────────────
-  const { data: cData, error: cErr } = await supa.rpc("get_active_code", {
-    p_end_user_id: row.end_user_id,
+  // ─── 1. look up the unit + active code + policy ─────────────────────────
+  const { data: uData, error: uErr } = await supa.rpc("lookup_unit", {
     p_unit_label: args.unit_label,
   });
-
-  if (cErr) {
-    console.error("get_active_code error", cErr);
-    return reply(toolCall.id, { ok: false, error: "internal", message: "Let me transfer you to a person." });
-  }
-
-  const code = Array.isArray(cData) ? cData[0] : cData;
-  if (!code?.code_value) {
-    await supa.rpc("log_access", {
-      p_org_id: row.org_id,
-      p_unit_id: null,
-      p_end_user_id: row.end_user_id,
-      p_call_id: callId,
-      p_result: "not_found",
-      p_reason: `no active code or not authorized for ${args.unit_label}`,
-    });
+  if (uErr) {
+    console.error("lookup_unit error", uErr);
     return reply(toolCall.id, {
       ok: false,
-      error: "not_authorized_or_no_code",
-      message: `I don't have an active code for ${args.unit_label} on your account.`,
+      error: "internal",
+      message: "Something went wrong on my end. Let me transfer you.",
+    });
+  }
+  const unit = Array.isArray(uData) ? uData[0] : uData;
+
+  if (!unit) {
+    await logAccess({ org_id: null, unit_id: null, end_user_id: null, call_id: callId, result: "not_found", reason: `unit ${args.unit_label} does not exist` });
+    return reply(toolCall.id, {
+      ok: false,
+      error: "not_found",
+      message: `I don't have a unit named ${args.unit_label}. Can you check the sticker on the unit and try again?`,
     });
   }
 
-  // ─── 3. log + return ────────────────────────────────────────────────────
-  await supa.rpc("log_access", {
-    p_org_id: row.org_id,
-    p_unit_id: code.unit_id,
-    p_end_user_id: row.end_user_id,
-    p_call_id: callId,
-    p_result: "success",
-    p_reason: null,
-  });
+  if (!unit.code_value) {
+    await logAccess({ org_id: unit.org_id, unit_id: unit.unit_id, end_user_id: null, call_id: callId, result: "not_found", reason: "no active code" });
+    return reply(toolCall.id, {
+      ok: false,
+      error: "no_active_code",
+      message: `There's no active code for ${unit.unit_label} right now. Let me transfer you to a person.`,
+    });
+  }
 
+  // ─── 2. open units: deliver the code, no auth required ──────────────────
+  if (unit.access_policy === "open") {
+    await logAccess({ org_id: unit.org_id, unit_id: unit.unit_id, end_user_id: null, call_id: callId, result: "success", reason: "open_policy" });
+    return reply(toolCall.id, {
+      ok: true,
+      policy: "open",
+      unit_label: unit.unit_label,
+      code: unit.code_value,
+      valid_until: unit.valid_until,
+      message: `Code for ${unit.unit_label} is ${unit.code_value.split("").join(" ")}.`,
+    });
+  }
+
+  // ─── 3. restricted units: require phone + allowlist check ───────────────
+  if (!args.phone_e164) {
+    return reply(toolCall.id, {
+      ok: false,
+      error: "needs_phone",
+      policy: "restricted",
+      message: `${unit.unit_label} is a restricted unit. What number are you calling from?`,
+    });
+  }
+
+  const { data: aData, error: aErr } = await supa.rpc("is_authorized", {
+    p_phone: args.phone_e164,
+    p_unit_id: unit.unit_id,
+  });
+  if (aErr) {
+    console.error("is_authorized error", aErr);
+    return reply(toolCall.id, { ok: false, error: "internal", message: "Let me transfer you to a person." });
+  }
+  const authz = Array.isArray(aData) ? aData[0] : aData;
+
+  if (!authz?.authorized) {
+    await logAccess({ org_id: unit.org_id, unit_id: unit.unit_id, end_user_id: authz?.end_user_id ?? null, call_id: callId, result: "denied", reason: "not_on_allowlist" });
+    return reply(toolCall.id, {
+      ok: false,
+      error: "not_authorized",
+      policy: "restricted",
+      message: `That phone number isn't on the allowlist for ${unit.unit_label}. Want me to connect you to the operator?`,
+    });
+  }
+
+  await logAccess({ org_id: unit.org_id, unit_id: unit.unit_id, end_user_id: authz.end_user_id, call_id: callId, result: "success", reason: "restricted_policy_authorized" });
   return reply(toolCall.id, {
     ok: true,
-    unit_label: code.unit_label,
-    code: code.code_value,
-    valid_until: code.valid_until,
-    message: `Code for ${code.unit_label} is ${code.code_value.split("").join(" ")}.`,
+    policy: "restricted",
+    unit_label: unit.unit_label,
+    code: unit.code_value,
+    valid_until: unit.valid_until,
+    message: `Code for ${unit.unit_label} is ${unit.code_value.split("").join(" ")}.`,
   });
 });

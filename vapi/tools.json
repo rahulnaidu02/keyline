@@ -4,20 +4,20 @@
       "type": "function",
       "function": {
         "name": "get_code",
-        "description": "Verify the caller by phone and return the active access code for the requested unit. Returns ok=false with a message if the phone isn't registered, the caller is not authorized for that unit, or no active code exists. Always call this tool — never invent a code.",
+        "description": "Look up the active access code for a unit. Always start with just the unit_label. If the response is error=needs_phone, ask the caller for their phone number and call again with both unit_label and phone_e164. Open-policy units return the code without auth; restricted-policy units require the caller's phone to be on the rentor's allowlist. Never invent a code.",
         "parameters": {
           "type": "object",
           "properties": {
-            "phone_e164": {
-              "type": "string",
-              "description": "Caller's phone number in E.164 format, e.g. +15555550111. Use the caller-ID-derived value if available; otherwise ask the caller and normalize (add +1 for US callers if missing)."
-            },
             "unit_label": {
               "type": "string",
               "description": "The unit's printed label, e.g. 'PR-204' or 'BLUE-7'. Pass exactly as the caller said it; the backend match is case-insensitive."
+            },
+            "phone_e164": {
+              "type": "string",
+              "description": "Caller's phone number in E.164 format, e.g. +15555550111. Only required when the first call returns error=needs_phone. Normalize spoken numbers (strip spaces/dashes, add +1 for US if missing)."
             }
           },
-          "required": ["phone_e164", "unit_label"]
+          "required": ["unit_label"]
         }
       },
       "server": {
