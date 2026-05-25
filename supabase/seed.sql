@@ -27,13 +27,13 @@ insert into units (id, org_id, label, notes) values
   ('22222222-2222-2222-2222-222222222204', '11111111-1111-1111-1111-111111111111', 'PR-204',  'Park-row 204, downtown'),
   ('22222222-2222-2222-2222-222222222301', '11111111-1111-1111-1111-111111111111', 'PR-301',  'Park-row 301, riverfront'),
   ('22222222-2222-2222-2222-2222222207b7', '11111111-1111-1111-1111-111111111111', 'BLUE-7',  'Blue trailer #7, event circuit'),
-  ('22222222-2222-2222-2222-22222222ghos', '11111111-1111-1111-1111-111111111111', 'GHOST-1', 'Test unit no one is authorized for');
+  ('22222222-2222-2222-2222-2222222dead1', '11111111-1111-1111-1111-111111111111', 'GHOST-1', 'Test unit no one is authorized for');
 
 insert into codes (unit_id, value, valid_until) values
   ('22222222-2222-2222-2222-222222222204', '7391', now() + interval '30 days'),
   ('22222222-2222-2222-2222-222222222301', '8124', now() + interval '7 days'),
   ('22222222-2222-2222-2222-2222222207b7', '5566', now() + interval '24 hours'),
-  ('22222222-2222-2222-2222-22222222ghos', '9999', now() + interval '7 days');
+  ('22222222-2222-2222-2222-2222222dead1', '9999', now() + interval '7 days');
 
 -- PIN hashes use pgcrypto bcrypt (gen_salt('bf')). Stored as crypt(pin, salt).
 insert into end_users (id, org_id, name, phone_e164, pin_hash) values
