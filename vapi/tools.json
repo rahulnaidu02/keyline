@@ -10,11 +10,11 @@
           "properties": {
             "unit_label": {
               "type": "string",
-              "description": "The unit's printed label, e.g. 'PR-204' or 'BLUE-7'. Pass exactly as the caller said it; the backend match is case-insensitive."
+              "description": "The unit's printed label, e.g. 'P204' or 'P015'. Convert spoken word-numbers to digits before passing."
             },
             "phone_e164": {
               "type": "string",
-              "description": "Caller's phone number in E.164 format, e.g. +15555550111. Only required when the first call returns error=needs_phone. Normalize spoken numbers (strip spaces/dashes, add +1 for US if missing)."
+              "description": "Caller's phone number in E.164 format, e.g. +15555550111. Only required when the first call returns error=needs_phone."
             }
           },
           "required": ["unit_label"]
@@ -28,10 +28,46 @@
       },
       "async": false,
       "messages": [
-        {
-          "type": "request-start",
-          "content": "One moment while I look that up."
+        { "type": "request-start", "content": "One moment while I look that up." }
+      ]
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "rotate_code",
+        "description": "Change (rotate) the active access code for a unit. ONLY the rentor (the phone number registered against the unit) can do this. The backend verifies the caller_phone matches the unit's rentor; if not, returns error=not_rentor. Always read the new code back and get caller confirmation before calling this tool.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "unit_label": {
+              "type": "string",
+              "description": "The unit's printed label, e.g. 'P204'. Convert spoken word-numbers to digits."
+            },
+            "new_code": {
+              "type": "string",
+              "description": "The new code to set. 4-8 digits, digits only (no letters, no spaces)."
+            },
+            "caller_phone": {
+              "type": "string",
+              "description": "Caller's phone in E.164, e.g. +15555550111. Must match the unit's registered rentor phone."
+            },
+            "valid_hours": {
+              "type": "integer",
+              "description": "How many hours the new code stays active. Default 24 if caller doesn't specify. Examples: '1 day' = 24, '3 days' = 72, '1 week' = 168."
+            }
+          },
+          "required": ["unit_label", "new_code", "caller_phone"]
         }
+      },
+      "server": {
+        "url": "https://YOUR_PROJECT_REF.supabase.co/functions/v1/rotate_code",
+        "headers": {
+          "x-vapi-secret": "REPLACE_WITH_VAPI_SHARED_SECRET"
+        }
+      },
+      "async": false,
+      "messages": [
+        { "type": "request-start", "content": "Got it, updating the code now." }
       ]
     }
   ]

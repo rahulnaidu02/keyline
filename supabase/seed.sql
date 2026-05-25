@@ -1,11 +1,13 @@
 -- KeyLine demo seed data.
 -- Run after migrations: `supabase db query --linked -f supabase/seed.sql`
 --
--- Demo units (short, easy-to-say sticker names — letter "P" + 3 digits):
+-- Demo units (P + 3 digits, easy for ASR):
 --   P015   open         →  anyone with the unit name              →  code 5566
 --   P204   restricted   →  Caller A (+15555550111) on allowlist   →  code 7391
 --   P301   restricted   →  Caller A (+15555550111) on allowlist   →  code 8124
---   P999   restricted   →  nobody on allowlist (for denial demo)  →  code 9999
+--   P999   restricted   →  nobody on allowlist (denial demo)      →  code 9999
+--
+-- Rentor: +15555550111 is the rentor for ALL 4 units → can rotate any of them.
 --
 -- Re-run safe: truncates everything first.
 
@@ -19,11 +21,11 @@ with new_org as (
 insert into operators (org_id, email, role)
 select id, 'ops@acme-sanitation.test', 'admin' from new_org;
 
-insert into units (id, org_id, label, notes, access_policy) values
-  ('22222222-2222-2222-2222-222222222015', '11111111-1111-1111-1111-111111111111', 'P015', 'Park-row open public event',        'open'),
-  ('22222222-2222-2222-2222-222222222204', '11111111-1111-1111-1111-111111111111', 'P204', 'Park-row 204, downtown',            'restricted'),
-  ('22222222-2222-2222-2222-222222222301', '11111111-1111-1111-1111-111111111111', 'P301', 'Park-row 301, riverfront',          'restricted'),
-  ('22222222-2222-2222-2222-222222222999', '11111111-1111-1111-1111-111111111111', 'P999', 'Test unit no one is authorized for','restricted');
+insert into units (id, org_id, label, notes, access_policy, rentor_phone) values
+  ('22222222-2222-2222-2222-222222222015', '11111111-1111-1111-1111-111111111111', 'P015', 'Park-row open public event',        'open',       '+15555550111'),
+  ('22222222-2222-2222-2222-222222222204', '11111111-1111-1111-1111-111111111111', 'P204', 'Park-row 204, downtown',            'restricted', '+15555550111'),
+  ('22222222-2222-2222-2222-222222222301', '11111111-1111-1111-1111-111111111111', 'P301', 'Park-row 301, riverfront',          'restricted', '+15555550111'),
+  ('22222222-2222-2222-2222-222222222999', '11111111-1111-1111-1111-111111111111', 'P999', 'Test unit no one is authorized for','restricted', '+15555550111');
 
 insert into codes (unit_id, value, valid_until) values
   ('22222222-2222-2222-2222-222222222015', '5566', now() + interval '24 hours'),
@@ -34,7 +36,7 @@ insert into codes (unit_id, value, valid_until) values
 insert into end_users (id, org_id, name, phone_e164) values
   ('33333333-3333-3333-3333-333333333aaa',
    '11111111-1111-1111-1111-111111111111',
-   'Alex (Caller A)',
+   'Alex (Caller A, also rentor)',
    '+15555550111');
 
 insert into authorizations (end_user_id, unit_id) values
