@@ -1,7 +1,7 @@
 // KeyLine: get_code edge function
-// Called by Vapi as a function tool. Vapi posts a tool-call event;
-// we authenticate the caller, look up the active code, log the access,
-// and respond in Vapi's expected tool-call-result format.
+// Called by Vapi as a function tool. Authenticates by caller phone,
+// looks up active code for the requested unit, logs the access,
+// returns Vapi's expected tool-call-result format.
 //
 // Deploy:  supabase functions deploy get_code --no-verify-jwt
 // Secrets: supabase secrets set VAPI_SHARED_SECRET=<long-random>
@@ -62,22 +62,20 @@ Deno.serve(async (req) => {
   const callId = body.message.call?.id ?? null;
   const args = parseArgs(toolCall.function.arguments) as {
     phone_e164?: string;
-    user_pin?: string;
     unit_label?: string;
   };
 
-  if (!args.phone_e164 || !args.user_pin || !args.unit_label) {
+  if (!args.phone_e164 || !args.unit_label) {
     return reply(toolCall.id, {
       ok: false,
       error: "missing_args",
-      message: "I need your phone number, PIN, and the unit name.",
+      message: "I need your phone number and the unit name.",
     });
   }
 
-  // ─── 1. verify caller ───────────────────────────────────────────────────
+  // ─── 1. verify caller by phone ─────────────────────────────────────────
   const { data: vData, error: vErr } = await supa.rpc("verify_caller", {
     p_phone: args.phone_e164,
-    p_pin: args.user_pin,
   });
 
   if (vErr) {
@@ -88,19 +86,17 @@ Deno.serve(async (req) => {
   const row = Array.isArray(vData) ? vData[0] : vData;
   if (!row?.end_user_id) {
     await supa.rpc("log_access", {
-      p_org_id: row?.org_id ?? null,
+      p_org_id: null,
       p_unit_id: null,
       p_end_user_id: null,
       p_call_id: callId,
-      p_result: row?.locked ? "locked" : "denied",
-      p_reason: row?.locked ? "too_many_failed_pins" : "bad_phone_or_pin",
+      p_result: "denied",
+      p_reason: "phone_not_registered",
     });
     return reply(toolCall.id, {
       ok: false,
-      error: row?.locked ? "locked" : "auth_failed",
-      message: row?.locked
-        ? "This phone number is temporarily locked due to too many failed attempts. Please try again in fifteen minutes or stay on the line to talk to a person."
-        : "I couldn't verify that phone number and PIN combination.",
+      error: "phone_not_registered",
+      message: "I don't recognize that phone number. Please make sure your operator has added you, or stay on the line to talk to a person.",
     });
   }
 
