@@ -1,0 +1,42 @@
+{
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_code",
+        "description": "Authenticate the caller (phone + PIN) and return the active access code for the requested unit. Returns ok=false with a message if auth fails, the caller is not authorized for that unit, or no active code exists. Always call this tool — never invent a code.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "phone_e164": {
+              "type": "string",
+              "description": "Caller's phone number in E.164 format, e.g. +15555550111. Use the caller-ID-derived value if available; otherwise ask the caller and normalize."
+            },
+            "user_pin": {
+              "type": "string",
+              "description": "Caller's 4-digit PIN. Pass exactly as the caller spoke it, digits only."
+            },
+            "unit_label": {
+              "type": "string",
+              "description": "The unit's printed label, e.g. 'PR-204' or 'BLUE-7'. Pass exactly as the caller said it; the backend match is case-insensitive."
+            }
+          },
+          "required": ["phone_e164", "user_pin", "unit_label"]
+        }
+      },
+      "server": {
+        "url": "https://YOUR_PROJECT_REF.supabase.co/functions/v1/get_code",
+        "headers": {
+          "x-vapi-secret": "REPLACE_WITH_VAPI_SHARED_SECRET"
+        }
+      },
+      "async": false,
+      "messages": [
+        {
+          "type": "request-start",
+          "content": "One moment while I look that up."
+        }
+      ]
+    }
+  ]
+}

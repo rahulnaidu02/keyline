@@ -1,0 +1,39 @@
+{
+  "name": "KeyLine",
+  "firstMessage": "Thanks for calling KeyLine. To look up your code, I need your phone number, your four-digit PIN, and the unit name.",
+  "firstMessageMode": "assistant-speaks-first",
+  "model": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5",
+    "temperature": 0.2,
+    "systemPrompt": "PASTE_CONTENTS_OF_system-prompt.md_HERE",
+    "tools": "SEE_tools.json"
+  },
+  "voice": {
+    "provider": "vapi",
+    "voiceId": "Tara"
+  },
+  "transcriber": {
+    "provider": "deepgram",
+    "model": "nova-3",
+    "language": "en"
+  },
+  "silenceTimeoutSeconds": 20,
+  "responseDelaySeconds": 0.4,
+  "llmRequestDelaySeconds": 0.1,
+  "numWordsToInterruptAssistant": 2,
+  "maxDurationSeconds": 300,
+  "endCallFunctionEnabled": true,
+  "recordingEnabled": true,
+  "hipaaEnabled": false,
+  "analysisPlan": {
+    "summaryPrompt": "Summarize what the caller wanted, whether they got their code, and any issues. Be terse (under 50 words).",
+    "successEvaluationPrompt": "Did the caller leave with the code they wanted? Answer yes/no/partial.",
+    "structuredDataPrompt": "Extract: unit_label asked for, auth_success (bool), code_delivered (bool), escalated (bool), failure_reason (string|null)."
+  },
+  "_notes": [
+    "This is a reference config. Vapi's web UI is the source of truth — paste system-prompt.md and tools.json values into the matching fields.",
+    "Pick your voice & transcriber in the UI; the values above are suggestions.",
+    "Set the tool's server URL header `x-vapi-secret` to match the VAPI_SHARED_SECRET in Supabase."
+  ]
+}
